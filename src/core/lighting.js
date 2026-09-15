@@ -31,7 +31,7 @@ const DEG = Math.PI / 180;
  * exposure — the environment already does that. Left at full strength they
  * double-count every source and blow the image out by several stops.
  */
-const DIRECT_ENERGY_SCALE = 0.70;
+const DIRECT_ENERGY_SCALE = 0.196;
 
 export class LightRig {
   constructor() {

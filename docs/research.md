@@ -194,6 +194,40 @@ nothing perceptible.
 
 ---
 
+## 4a. Two defects found by testing other formats
+
+Both were invisible while only OBJ was being tested, and both had been shipped.
+
+**The exposure calibration was measured against back-faces.** The white-clay
+reference used to set the light levels was rendered *before* the test model's
+reversed face winding was found and fixed. Raster shading uses the supplied
+vertex normals and happily shades an inside-out mesh, so the calibration
+measured the far wall of the object rather than the near one, and settled on a
+level roughly three times too hot. Nothing looked obviously wrong afterwards
+because the models in use were dark or saturated — a red body, a gold metal —
+where overexposure reads as "bright and glossy". A white surface is what exposes
+it: white clay came out as a featureless silhouette, 77% of it clipped.
+
+The fix was to re-run the calibration on correct geometry and, more usefully, to
+make the measurement honest: `calib.mjs` now renders the reference on a
+transparent background and uses the alpha channel to measure the *subject only*,
+reporting the brightness distribution and clipped fraction rather than a couple
+of hand-placed probe points that could miss the peaks entirely.
+
+**"Original" materials were not original.** Every extended PBR property —
+clearcoat, transmission, sheen, iridescence, anisotropy, IOR, volume — was
+written from the UI's default on every material rebuild. For an OBJ this is
+harmless, because classic MTL cannot express any of them. For a GLTF it silently
+discarded whatever the file authored: the Khronos TransmissionTest rendered as
+a grid of opaque balls.
+
+The fix is that a control only takes effect once it differs from its default, or
+when a material preset asks for it explicitly; otherwise the authored value
+stands. The general lesson is that a UI default and "no opinion" are not the same
+value, and conflating them quietly destroys data.
+
+---
+
 ## 5. What was deliberately left out
 
 **Denoising (OIDN/OptiX).** Would cut path-trace times substantially. There is no
@@ -202,6 +236,10 @@ engine. Worth revisiting.
 
 **Volumetrics and caustic-heavy scenes.** The path tracer supports basic fog volumes;
 neither is a priority for product visualisation.
+
+**Retargeting and animation authoring.** Embedded clips play, and can be
+rendered frame by frame, but there is no timeline editing, blending or
+retargeting. That is a DCC tool's job.
 
 **Mesh editing and UV work.** Out of scope — this is a rendering environment, not a
 DCC tool.

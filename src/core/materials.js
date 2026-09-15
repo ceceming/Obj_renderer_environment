@@ -1,5 +1,17 @@
 import * as THREE from 'three';
 import { getMaterialPreset } from './presets/materials.js';
+import { defaultConfig } from './schema.js';
+
+/**
+ * The material section's defaults, used as "leave it alone" sentinels.
+ *
+ * A GLTF can author clearcoat, transmission, sheen, iridescence and the rest.
+ * Writing the UI's default over those on every rebuild would silently strip
+ * them — a transmissive material would render opaque, which looks like a
+ * renderer bug rather than a lost value. So a control only takes effect once it
+ * differs from its default, or when a material preset asks for it explicitly.
+ */
+const MATERIAL_DEFAULTS = defaultConfig().material;
 
 /**
  * Material handling.
@@ -44,6 +56,8 @@ export function fixTextureColorSpaces(material, anisotropy = 16) {
  * preserving every texture slot that has an equivalent.
  */
 export function toPhysical(src) {
+  // Already physical: every extension value is where it belongs, so hand it
+  // back untouched rather than rebuilding and risking dropping one.
   if (src.isMeshPhysicalMaterial) return src;
 
   const m = new THREE.MeshPhysicalMaterial();
@@ -207,24 +221,47 @@ function buildMaterial(orig, cfg, p, mode, envMapIntensity) {
     m.color.lerp(m.color.clone().multiply(tint), M.tintStrength ?? 1);
   }
 
-  // Extended physical properties
-  m.clearcoat = pick(p.clearcoat, M.clearcoat, 0);
-  m.clearcoatRoughness = pick(p.clearcoatRoughness, M.clearcoatRoughness, 0.1);
-  m.sheen = pick(p.sheen, M.sheen, 0);
-  m.sheenRoughness = pick(p.sheenRoughness, M.sheenRoughness, 0.3);
-  m.sheenColor.set(p.sheenColor || M.sheenColor || '#ffffff');
-  m.transmission = pick(p.transmission, M.transmission, 0);
-  m.thickness = pick(p.thickness, M.thickness, 0.5);
-  m.ior = pick(p.ior, M.ior, 1.5);
-  m.attenuationDistance = pick(p.attenuationDistance, M.attenuationDistance, Infinity) || Infinity;
-  m.attenuationColor.set(p.attenuationColor || M.attenuationColor || '#ffffff');
-  m.iridescence = pick(p.iridescence, M.iridescence, 0);
-  m.iridescenceIOR = pick(p.iridescenceIOR, M.iridescenceIOR, 1.3);
-  m.iridescenceThicknessRange = [100, pick(p.iridescenceThickness, M.iridescenceThickness, 400)];
-  m.anisotropy = pick(p.anisotropy, M.anisotropy, 0);
-  m.anisotropyRotation = (pick(p.anisotropyRotation, M.anisotropyRotation, 0) * Math.PI) / 180;
-  m.specularIntensity = pick(p.specularIntensity, M.specularIntensity, 1);
-  if (p.specularColor || M.specularColor) m.specularColor.set(p.specularColor || M.specularColor);
+  // Extended physical properties.
+  //
+  // `authored` wins unless a preset asks for a value, or the user has moved
+  // that control off its default — which is what keeps a GLTF's own clearcoat,
+  // transmission and volume settings intact under the 'original' treatment.
+  const keep = (key, authored) => {
+    if (p[key] !== undefined) return p[key];
+    if (M[key] !== undefined && M[key] !== MATERIAL_DEFAULTS[key]) return M[key];
+    return authored;
+  };
+  const keepColor = (key, authored) => {
+    const chosen = p[key] ?? (M[key] !== MATERIAL_DEFAULTS[key] ? M[key] : null);
+    return chosen || authored;
+  };
+
+  m.clearcoat = keep('clearcoat', m.clearcoat);
+  m.clearcoatRoughness = keep('clearcoatRoughness', m.clearcoatRoughness);
+  m.sheen = keep('sheen', m.sheen);
+  m.sheenRoughness = keep('sheenRoughness', m.sheenRoughness);
+  const sheenHex = keepColor('sheenColor', null);
+  if (sheenHex) m.sheenColor.set(sheenHex);
+  m.transmission = keep('transmission', m.transmission);
+  m.thickness = keep('thickness', m.thickness);
+  m.ior = keep('ior', m.ior);
+  // three uses Infinity for "no absorption"; a finite default would tint
+  // every transmissive surface that never asked for it.
+  const attenuation = keep('attenuationDistance', m.attenuationDistance);
+  m.attenuationDistance = Number.isFinite(attenuation) && attenuation > 0 ? attenuation : Infinity;
+  const attenuationHex = keepColor('attenuationColor', null);
+  if (attenuationHex) m.attenuationColor.set(attenuationHex);
+  m.iridescence = keep('iridescence', m.iridescence);
+  m.iridescenceIOR = keep('iridescenceIOR', m.iridescenceIOR);
+  const iriThickness = keep('iridescenceThickness', null);
+  if (iriThickness !== null && iriThickness !== undefined) {
+    m.iridescenceThicknessRange = [100, iriThickness];
+  }
+  m.anisotropy = keep('anisotropy', m.anisotropy);
+  m.anisotropyRotation = (keep('anisotropyRotation', 0) * Math.PI) / 180;
+  m.specularIntensity = keep('specularIntensity', m.specularIntensity);
+  const specularHex = keepColor('specularColor', null);
+  if (specularHex) m.specularColor.set(specularHex);
 
   if (m.transmission > 0) {
     m.transparent = true;

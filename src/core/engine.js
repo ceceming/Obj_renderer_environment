@@ -42,6 +42,10 @@ export class RenderEngine {
     this.subjectSize = 1;
     this.box = new THREE.Box3(new THREE.Vector3(-0.5, 0, -0.5), new THREE.Vector3(0.5, 1, 0.5));
     this.model = null;
+    this.mixer = null;
+    this.clips = [];
+    this._activeClip = 0;
+    this._action = null;
     this.modelStats = null;
     this.warnings = [];
     this._dirty = new Set(Object.values(DIRTY));
@@ -127,15 +131,46 @@ export class RenderEngine {
       this.modelRoot.remove(this.model);
       disposeObject(this.model);
     }
+    this.mixer = null;
+    this.clips = object?.userData?.animations || [];
     this.model = object;
     this.modelStats = stats || analyse(object);
     this.warnings = warnings;
     this.modelRoot.add(object);
+    if (this.clips.length) {
+      this.mixer = new THREE.AnimationMixer(object);
+      this._activeClip = 0;
+    }
     this._dirty.add(DIRTY.MODEL);
     this._dirty.add(DIRTY.MATERIALS);
     this._dirty.add(DIRTY.CAMERA);
     this.emit('model', { object, stats: this.modelStats, warnings });
   }
+
+  /**
+   * Pose the model at an absolute time within one of its embedded clips.
+   *
+   * `setTime` rather than `update(delta)`: seeking to an absolute time means
+   * frame N does not depend on frames 0..N-1, which is what keeps offline
+   * renders deterministic and resumable.
+   */
+  setClipTime(seconds, clipIndex = this._activeClip ?? 0) {
+    if (!this.mixer || !this.clips.length) return false;
+    const clip = this.clips[Math.min(clipIndex, this.clips.length - 1)];
+    if (!clip) return false;
+    if (this._activeClip !== clipIndex || !this._action) {
+      this.mixer.stopAllAction();
+      this._action = this.mixer.clipAction(clip);
+      this._action.play();
+      this._activeClip = clipIndex;
+    }
+    this.mixer.setTime(0);                   // rewind, then seek: setTime is relative
+    this.mixer.setTime(Math.max(0, seconds));
+    this.modelRoot.updateMatrixWorld(true);
+    return true;
+  }
+
+  get clipList() { return this.clips || []; }
 
   /** Build a simple stand-in so the studio is usable before anything is loaded. */
   loadPlaceholder() {

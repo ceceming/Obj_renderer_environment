@@ -73,6 +73,14 @@ export const ANIMATION_PRESETS = {
     label: 'Pendulum', group: 'Product',
     note: 'Rocks back and forth across the front of the object. Loops perfectly and shows both sides.'
   },
+  clip: {
+    label: 'Embedded Clip', group: 'Source',
+    note: 'Plays the animation baked into the file itself — a GLTF or FBX character, a mechanism, a rig. The camera and lights hold still unless you move them.'
+  },
+  'clip-turntable': {
+    label: 'Clip + Turntable', group: 'Source',
+    note: 'Plays the embedded clip while the camera circles. Good for showing a rigged asset from every side in one take.'
+  },
   'material-morph': {
     label: 'Roughness Sweep', group: 'Material',
     note: 'Animates the surface from matte to mirror. A material study rather than a beauty shot.'
@@ -181,6 +189,13 @@ export function evaluateFrame(cfg, frame) {
       patch.camera = { azimuth: cfg.camera.azimuth + swing };
       break;
     }
+    case 'clip':
+      // The clip itself is applied by the driver, which needs the engine.
+      break;
+    case 'clip-turntable': {
+      patch.camera = { azimuth: cfg.camera.azimuth + t * 360 * (A.turntable?.direction ?? 1) };
+      break;
+    }
     case 'material-morph': {
       patch.material = { roughness: lerp(1.0, 0.04, t) };
       break;
@@ -194,7 +209,12 @@ export function evaluateFrame(cfg, frame) {
     Object.assign(patch, interpolateKeyframes(A.keyframes, tRaw, ease));
   }
 
-  return { patch, objectRotation, t, tRaw };
+  // Where in the embedded clip this frame sits, in seconds.
+  const clipTime = A.type === 'clip' || A.type === 'clip-turntable'
+    ? tRaw * Math.max(0.001, A.clipDuration || cfg.animation.duration)
+    : null;
+
+  return { patch, objectRotation, clipTime, t, tRaw };
 }
 
 function interpolateKeyframes(keys, t, ease) {
@@ -241,7 +261,7 @@ export class AnimationDriver {
   /** Apply frame N. Returns the resolved config used for that frame. */
   async applyFrame(frame) {
     const base = this.baseConfig || this.engine.config;
-    const { patch, objectRotation } = evaluateFrame(base, frame);
+    const { patch, objectRotation, clipTime } = evaluateFrame(base, frame);
 
     // Restore the base each time so patches never compound.
     this.engine.config = JSON.parse(JSON.stringify(base));
@@ -258,6 +278,8 @@ export class AnimationDriver {
     } else if (this.engine.modelRoot.rotation.lengthSq?.() !== 0) {
       this.engine.modelRoot.rotation.set(0, 0, 0);
     }
+
+    if (clipTime !== null) this.engine.setClipTime(clipTime, base.animation.clipIndex ?? 0);
 
     this.currentFrame = frame;
     await this.engine.prepare();

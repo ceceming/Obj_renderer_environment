@@ -303,6 +303,9 @@ export function defaultConfig() {
       lightSweep: { startRotation: 0, endRotation: 360 },
       exploded: { distance: 1.5, stagger: 0.15 },
       reveal: { mode: 'clip-y', direction: 'up' },
+      // Embedded clips carried by the file itself (GLTF/FBX).
+      clipIndex: 0,
+      clipDuration: null,          // null = use the clip's own length
       keyframes: []                // optional custom [{t, camera:{...}, lighting:{...}}]
     },
 

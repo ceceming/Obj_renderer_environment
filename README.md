@@ -250,12 +250,28 @@ Windows  winget install Gyan.FFmpeg
 
 ## Supported input
 
-`.obj` (+ `.mtl` + textures) · `.gltf` / `.glb` · `.fbx` · `.stl` · `.ply` ·
-`.dae` · `.3mf`, plus `.hdr` / `.exr` environment maps if you would rather use your
-own than the procedural rig.
+| Format | Materials | Notes |
+|---|---|---|
+| **`.glb` / `.gltf`** | Full PBR | The best-supported format. Metallic-roughness, normal/AO/emissive maps, and the `KHR_materials_*` extensions — clearcoat, transmission, sheen, iridescence, anisotropy, volume — are all read and preserved. |
+| **`.fbx`** | Converted to PBR | Geometry, materials, embedded textures, skeletons and animation clips. Legacy Phong materials are upgraded on load. |
+| **`.obj` + `.mtl`** | Converted to PBR | The classic pairing. Textures are resolved by filename, so an MTL written on another machine with absolute Windows paths still finds its maps. |
+| **`.dae`, `.3mf`** | Converted to PBR | Collada and 3MF. |
+| **`.stl`, `.ply`** | None / vertex colours | Geometry only — STL carries no materials or UVs, so use a Material preset. PLY vertex colours are honoured. |
+| **`.hdr` / `.exr`** | — | Environment maps, if you would rather use your own than the procedural rig. |
 
-Textures are resolved by filename, so an MTL written on another machine with
-absolute Windows paths still finds its maps.
+Verified against the Khronos sample assets: Damaged Helmet, ClearCoatTest and
+TransmissionTest all render correctly, as does a rigged, animated Mixamo FBX.
+
+### Animation carried inside the file
+
+GLTF and FBX files often contain their own animation — a rigged character, a
+mechanism, a camera move. Those clips are detected on load, listed by name and
+duration, and play under the **Embedded Clip** animation type (or **Clip +
+Turntable**, which orbits the camera at the same time). Pick a clip and the
+timeline adopts its authored length, so it plays at the speed it was made at.
+
+Without that, a file renders in its rest pose — which for a character means the
+T-pose.
 
 ---
 

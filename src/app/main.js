@@ -1,7 +1,7 @@
 import './styles.css';
 import { RenderEngine, DIRTY } from '../core/engine.js';
 import { defaultConfig, mergeConfig, fromJSON, RESOLUTION_PRESETS, validate } from '../core/schema.js';
-import { buildPanels, renderLightList } from './ui/panels.js';
+import { buildPanels, renderLightList, renderClipPicker } from './ui/panels.js';
 import { el } from './ui/controls.js';
 import { SUPPORTED_EXTENSIONS, TEXTURE_EXTENSIONS } from '../core/loaders.js';
 import { getLightingPreset } from '../core/presets/lighting.js';
@@ -59,6 +59,7 @@ class Studio {
 
     buildPanels(this.rail, this.engine, this);
     renderLightList(this, this.engine);
+    renderClipPicker(this, this.engine);
     this.bindTopbar();
     this.bindStage();
     this.bindKeys();
@@ -252,6 +253,7 @@ class Studio {
         files: urls
       });
       this.showStats(result.stats, result.warnings);
+      renderClipPicker(this, this.engine);
       this.builder?.refresh();
       await this.render(true);
       this.toast(`Loaded ${modelFile.file.name}`);

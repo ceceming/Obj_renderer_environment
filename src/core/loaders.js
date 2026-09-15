@@ -131,7 +131,7 @@ export async function loadModel({ url, name, files = {}, onProgress } = {}) {
       const loader = new GLTFLoader(manager);
       const gltf = await loader.loadAsync(url, progress);
       object = gltf.scene || gltf.scenes[0];
-      object.userData.animations = gltf.animations || [];
+      object.animations = gltf.animations || [];
       break;
     }
     case 'fbx': {
@@ -170,10 +170,22 @@ export async function loadModel({ url, name, files = {}, onProgress } = {}) {
   }
 
   if (!object) throw new Error('The file loaded but produced no geometry.');
+
+  // Each loader reports clips differently — GLTF hands them back beside the
+  // scene, FBX and Collada attach them to the root. Normalise so the rest of
+  // the engine has one place to look.
+  const clips = object.animations || [];
+  object.userData.animations = clips;
   object.name = object.name || stem(name || url);
   const stats = analyse(object);
+  stats.clips = clips.map((c) => ({ name: c.name || 'clip', duration: +c.duration.toFixed(3) }));
   if (stats.triangles === 0) warnings.push('The file contains no triangles — it may be a point cloud or an empty scene.');
   if (!stats.hasUVs && stats.hasTextures) warnings.push('Textures were found but the mesh has no UV coordinates, so they cannot be applied.');
+  if (clips.length) {
+    warnings.push(`This file carries ${clips.length} animation clip${clips.length === 1 ? '' : 's'} ` +
+      `(${clips.map((c) => `${c.name || 'clip'} ${c.duration.toFixed(1)}s`).join(', ')}). ` +
+      'Choose "Embedded clip" in the Animation section to render it, otherwise it renders in its rest pose.');
+  }
   if (stats.reversedWinding) warnings.push('This model\'s faces appear to be wound inside-out. It will still look right in the real-time preview, but turn on "Double-sided" before path tracing, or the object may render as a black silhouette.');
   if (stats.triangles > 3_000_000) warnings.push(`${stats.triangles.toLocaleString()} triangles is heavy. Real-time preview may be slow; the path tracer will still work but expect longer builds.`);
 

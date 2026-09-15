@@ -406,6 +406,8 @@ export function buildPanels(rail, engine, app) {
       label: 'Spin object (not camera)',
       hint: 'Spinning the object keeps the lighting fixed in the world, so highlights sweep across the surface like a real turntable.'
     }));
+    app.clipPickerEl = el('div', {});
+    b.append(app.clipPickerEl);
     app.frameCountEl = el('div', { class: 'hint' });
     b.append(app.frameCountEl);
     b.append(B.row(
@@ -493,6 +495,40 @@ export function buildPanels(rail, engine, app) {
 
   app.builder = builder;
   return builder;
+}
+
+/**
+ * Clip picker for files that carry their own animation. Hidden entirely when
+ * the loaded model has none, rather than showing an empty control.
+ */
+export function renderClipPicker(app, engine) {
+  const host = app.clipPickerEl;
+  if (!host) return;
+  host.textContent = '';
+  const clips = engine.clipList || [];
+  if (!clips.length) return;
+
+  const sel = el('select', {});
+  clips.forEach((c, i) => sel.append(el('option', {
+    value: i, text: `${c.name || `clip ${i + 1}`} · ${c.duration.toFixed(1)}s`
+  })));
+  sel.value = String(engine.config.animation.clipIndex ?? 0);
+  sel.addEventListener('change', () => {
+    const i = Number(sel.value);
+    app.onChange({ animation: {
+      clipIndex: i,
+      // Default the timeline to the clip's own length so it plays at its
+      // authored speed rather than being stretched to an unrelated duration.
+      duration: clips[i].duration || engine.config.animation.duration,
+      clipDuration: clips[i].duration || null
+    } }, { commit: true, structural: true, path: 'animation.clipIndex' });
+    app.builder?.refresh();
+  });
+
+  host.append(el('div', { class: 'ctrl' }, [
+    el('label', {}, [el('span', { text: 'Embedded clip' })]), sel,
+    el('div', { class: 'hint', text: 'Choose the "Embedded Clip" animation type above to render this.' })
+  ]));
 }
 
 /** Renders the editable list of lights. Rebuilt whenever the rig changes. */

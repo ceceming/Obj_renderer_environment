@@ -29,11 +29,15 @@ const DEG = Math.PI / 180;
  * irradiance near 10 — about ten stops hot, which saturates every channel and
  * leaves the tone mapper bleaching everything to white regardless of albedo.
  *
- * This factor converts the readable numbers into physically sane radiance, so
- * a mid-grey surface renders as mid-grey. It was set by rendering a calibration
- * sweep and measuring the result, not by eye.
+ * This factor converts the readable numbers into physically sane radiance. It
+ * is set by `calib.mjs`, which renders a white-clay reference (albedo 0.94) on
+ * a transparent background — so the subject can be isolated by its alpha — and
+ * measures the brightness distribution across it. The level is chosen so the
+ * 99th percentile of a white surface sits just below clipping: white reads as
+ * white, nothing blows out, and darker materials fall where they should with
+ * the exposure control available to lift them.
  */
-export const ENV_ENERGY_SCALE = 2.4;
+export const ENV_ENERGY_SCALE = 0.672;
 
 /**
  * Reference emitter area (a 3x3 softbox).
@@ -62,12 +66,12 @@ export const REFERENCE_AREA = 9.0;
  * sky genuinely *is* the light.
  */
 export const SKY_INTENSITY_BY_MODE = {
-  studio: 0.32,
-  daylight: 3.2,
-  overcast: 3.2,
-  sunset: 3.2,
-  night: 3.2,
-  gradient: 1.9
+  studio: 0.09,
+  daylight: 0.896,
+  overcast: 0.896,
+  sunset: 0.896,
+  night: 0.896,
+  gradient: 0.532
 };
 
 export function resolveSkyIntensity(sky = {}) {
