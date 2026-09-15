@@ -1,0 +1,427 @@
+{
+  "schemaVersion": 3,
+  "name": "cutout2",
+  "model": {
+    "source": null,
+    "upAxis": "y-up",
+    "autoCenter": true,
+    "autoGround": true,
+    "autoScale": true,
+    "targetSize": 1,
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "scale": 1,
+    "smoothing": "auto",
+    "smoothAngle": 45,
+    "doubleSided": false,
+    "flipNormals": false,
+    "weldVertices": false
+  },
+  "camera": {
+    "preset": "three-quarter",
+    "projection": "perspective",
+    "sensor": "full-frame",
+    "focalLength": 85,
+    "orthoZoom": 1,
+    "azimuth": 35,
+    "elevation": 12,
+    "distance": "auto",
+    "framing": 0.85,
+    "target": {
+      "x": 0,
+      "y": 0.5,
+      "z": 0
+    },
+    "targetMode": "auto",
+    "roll": 0,
+    "shift": {
+      "x": 0,
+      "y": 0
+    },
+    "near": 0.01,
+    "far": 1000,
+    "dof": {
+      "enabled": false,
+      "focusMode": "subject",
+      "focusDistance": 2,
+      "fStop": 2.8,
+      "maxBlur": 0.012,
+      "bokehBlades": 6,
+      "bokehRotation": 0
+    }
+  },
+  "lighting": {
+    "preset": "studio-softbox",
+    "intensity": 1,
+    "envRotation": 0,
+    "envIntensity": 1,
+    "temperature": 6000,
+    "environment": {
+      "type": "procedural",
+      "hdriUrl": null,
+      "hdriExposure": 1,
+      "sky": {
+        "mode": "studio",
+        "intensity": null,
+        "zenith": "#e8ecf2",
+        "horizon": "#f6f7f9",
+        "ground": "#b8bcc4",
+        "sunEnabled": false,
+        "sunAzimuth": 130,
+        "sunElevation": 35,
+        "sunAngularSize": 2,
+        "sunIntensity": 6,
+        "sunColor": "#fff4e0",
+        "turbidity": 2.5
+      },
+      "lights": [
+        {
+          "id": "l1",
+          "role": "key",
+          "name": "Key softbox",
+          "enabled": true,
+          "type": "area",
+          "shape": "rect",
+          "azimuth": -42,
+          "elevation": 28,
+          "distance": 2.6,
+          "width": 4,
+          "height": 4,
+          "intensity": 8.889,
+          "color": "#ffffff",
+          "temperature": 6000,
+          "spread": 1,
+          "falloff": "inverse-square",
+          "visible": false,
+          "castShadow": true,
+          "relativeTo": "world",
+          "barnDoors": 0,
+          "gel": null
+        },
+        {
+          "id": "l2",
+          "role": "fill",
+          "name": "Fill panel",
+          "enabled": true,
+          "type": "area",
+          "shape": "rect",
+          "azimuth": 58,
+          "elevation": 12,
+          "distance": 3.2,
+          "width": 5,
+          "height": 3.5,
+          "intensity": 2.917,
+          "color": "#ffffff",
+          "temperature": 6500,
+          "spread": 1,
+          "falloff": "inverse-square",
+          "visible": false,
+          "castShadow": false,
+          "relativeTo": "world",
+          "barnDoors": 0,
+          "gel": null
+        },
+        {
+          "id": "l3",
+          "role": "top",
+          "name": "Overhead",
+          "enabled": true,
+          "type": "area",
+          "shape": "rect",
+          "azimuth": 0,
+          "elevation": 78,
+          "distance": 2.8,
+          "width": 4.5,
+          "height": 3,
+          "intensity": 2.7,
+          "color": "#ffffff",
+          "temperature": 6200,
+          "spread": 1,
+          "falloff": "inverse-square",
+          "visible": false,
+          "castShadow": false,
+          "relativeTo": "world",
+          "barnDoors": 0,
+          "gel": null
+        },
+        {
+          "id": "l4",
+          "role": "rim",
+          "name": "Edge strip",
+          "enabled": true,
+          "type": "area",
+          "shape": "strip",
+          "azimuth": 165,
+          "elevation": 26,
+          "distance": 2.6,
+          "width": 0.5,
+          "height": 3.2,
+          "intensity": 0.391,
+          "color": "#ffffff",
+          "temperature": 6800,
+          "spread": 1,
+          "falloff": "inverse-square",
+          "visible": false,
+          "castShadow": false,
+          "relativeTo": "world",
+          "barnDoors": 0,
+          "gel": null
+        }
+      ]
+    },
+    "shadows": {
+      "enabled": true,
+      "type": "soft",
+      "resolution": 2048,
+      "softness": 1.15,
+      "opacity": 0.38,
+      "bias": -0.0005,
+      "normalBias": 0.02,
+      "catcher": true,
+      "catcherSize": 12,
+      "contactShadow": {
+        "enabled": true,
+        "darkness": 1,
+        "blur": 2.4,
+        "height": 0.35,
+        "resolution": 512
+      }
+    },
+    "keyToFill": 3,
+    "rimStrength": 0.6,
+    "bounceStrength": 0.55,
+    "bounceColor": "#ffffff"
+  },
+  "material": {
+    "mode": "original",
+    "roughness": 1,
+    "metalness": 1,
+    "roughnessOffset": 0,
+    "metalnessOffset": 0,
+    "normalScale": 1,
+    "aoIntensity": 1,
+    "emissiveIntensity": 1,
+    "clearcoat": 0,
+    "clearcoatRoughness": 0.1,
+    "sheen": 0,
+    "sheenColor": "#ffffff",
+    "sheenRoughness": 0.3,
+    "transmission": 0,
+    "thickness": 0.5,
+    "ior": 1.5,
+    "attenuationDistance": 1,
+    "attenuationColor": "#ffffff",
+    "iridescence": 0,
+    "iridescenceIOR": 1.3,
+    "iridescenceThickness": 400,
+    "anisotropy": 0,
+    "anisotropyRotation": 0,
+    "specularIntensity": 1,
+    "specularColor": "#ffffff",
+    "textureAnisotropy": 16,
+    "uvScale": 1,
+    "tint": null,
+    "tintStrength": 1,
+    "overrideColor": null,
+    "wireframe": false,
+    "wireframeThickness": 1,
+    "outline": {
+      "enabled": false,
+      "color": "#000000",
+      "thickness": 1.5,
+      "threshold": 0.6
+    }
+  },
+  "background": {
+    "type": "solid",
+    "color": "#f2f2f4",
+    "gradient": {
+      "top": "#ffffff",
+      "bottom": "#c9ced8",
+      "angle": 180,
+      "style": "linear"
+    },
+    "envBlur": 0.25,
+    "envIntensity": 1,
+    "imageUrl": null,
+    "imageFit": "cover",
+    "cyc": {
+      "color": "#ededf0",
+      "curveRadius": 1.6,
+      "roughness": 0.85,
+      "size": 20,
+      "receiveShadow": true
+    },
+    "floor": {
+      "enabled": false,
+      "type": "glossy",
+      "color": "#0e0e10",
+      "roughness": 0.12,
+      "metalness": 0,
+      "reflectivity": 0.6,
+      "fadeDistance": 6
+    }
+  },
+  "look": {
+    "preset": "clean",
+    "tonemap": "agx",
+    "exposure": 1,
+    "contrast": 1,
+    "saturation": 1,
+    "temperatureShift": 0,
+    "tintShift": 0,
+    "lift": "#000000",
+    "gamma": "#808080",
+    "gain": "#ffffff",
+    "bloom": {
+      "enabled": true,
+      "intensity": 0.22,
+      "threshold": 1.12,
+      "radius": 0.5,
+      "smoothing": 0.08
+    },
+    "ao": {
+      "enabled": true,
+      "intensity": 0.9,
+      "radius": 0.35,
+      "samples": 16,
+      "distanceFalloff": 1,
+      "denoise": true,
+      "color": "#000000"
+    },
+    "vignette": {
+      "enabled": false,
+      "amount": 0.35,
+      "offset": 0.9,
+      "roundness": 1
+    },
+    "grain": {
+      "enabled": false,
+      "amount": 0.035,
+      "size": 1,
+      "animated": true,
+      "colored": false
+    },
+    "chromaticAberration": {
+      "enabled": false,
+      "amount": 0.0012
+    },
+    "sharpen": {
+      "enabled": false,
+      "amount": 0.3
+    },
+    "lut": {
+      "enabled": false,
+      "url": null,
+      "intensity": 1
+    },
+    "halation": {
+      "enabled": false,
+      "amount": 0.15,
+      "threshold": 0.9,
+      "tint": "#ff7a3c"
+    }
+  },
+  "render": {
+    "engine": "raster",
+    "width": 1080,
+    "height": 1080,
+    "resolutionPreset": "square-1080",
+    "pixelRatio": 1,
+    "antialias": "smaa",
+    "pathtrace": {
+      "samples": 256,
+      "bounces": 6,
+      "transmissiveBounces": 4,
+      "filterGlossy": 0.1,
+      "tiles": 2,
+      "multipleImportanceSampling": true,
+      "environmentBlur": 0,
+      "backgroundAlpha": 1
+    },
+    "accumulate": {
+      "enabled": false,
+      "frames": 64,
+      "jitter": 0.5
+    }
+  },
+  "animation": {
+    "enabled": false,
+    "type": "turntable",
+    "duration": 6,
+    "fps": 30,
+    "easing": "linear",
+    "loop": true,
+    "pingPong": false,
+    "motionBlur": {
+      "enabled": false,
+      "shutter": 0.5,
+      "samples": 8
+    },
+    "turntable": {
+      "axis": "y",
+      "revolutions": 1,
+      "direction": 1,
+      "spinObject": true
+    },
+    "orbit": {
+      "startAzimuth": -30,
+      "endAzimuth": 30,
+      "startElevation": 5,
+      "endElevation": 30
+    },
+    "dolly": {
+      "startDistance": "auto",
+      "endDistance": "auto",
+      "zoomFactor": 0.6
+    },
+    "lightSweep": {
+      "startRotation": 0,
+      "endRotation": 360
+    },
+    "exploded": {
+      "distance": 1.5,
+      "stagger": 0.15
+    },
+    "reveal": {
+      "mode": "clip-y",
+      "direction": "up"
+    },
+    "keyframes": []
+  },
+  "output": {
+    "format": "png",
+    "backgroundMode": "transparent",
+    "customBackground": "#ffffff",
+    "jpegQuality": 0.95,
+    "webpQuality": 0.95,
+    "alphaShadow": true,
+    "alphaShadowStrength": 1,
+    "batch": {
+      "enabled": false,
+      "angles": [],
+      "includeTurntableFrames": false
+    },
+    "passes": {
+      "beauty": true,
+      "alpha": false,
+      "depth": false,
+      "normal": false,
+      "ao": false,
+      "matte": false,
+      "shadowOnly": false,
+      "wireframe": false
+    },
+    "namePattern": "{name}_{preset}_{w}x{h}",
+    "frameNamePattern": "{name}_{frame:04}",
+    "colorSpace": "srgb"
+  }
+}

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>__TITLE__</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: __PAGE_BG__;
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: __PAGE_FG__;
+    overflow: hidden;
+  }
+  #viewer { position: fixed; inset: 0; }
+  #hud {
+    position: fixed;
+    left: max(16px, env(safe-area-inset-left, 0px));
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    max-width: calc(100% - 32px);
+  }
+  #hud button {
+    font: inherit; font-size: 13px;
+    padding: 7px 13px; border-radius: 999px; cursor: pointer;
+    border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+    background: color-mix(in srgb, Canvas 78%, transparent);
+    color: inherit;
+    backdrop-filter: blur(12px);
+  }
+  #hud button:hover { background: color-mix(in srgb, Canvas 94%, transparent); }
+  #title {
+    position: fixed;
+    left: max(16px, env(safe-area-inset-left, 0px));
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    font-size: 13px; letter-spacing: .02em; opacity: .62;
+  }
+  #loading {
+    position: fixed; inset: 0; display: grid; place-items: center;
+    font-size: 13px; letter-spacing: .06em; text-transform: uppercase; opacity: .5;
+  }
+</style>
+</head>
+<body>
+  <div id="viewer"></div>
+  <div id="title">__TITLE__</div>
+  <div id="loading">Loading</div>
+  <div id="hud">
+    <button id="snap">Save PNG</button>
+    <button id="spin">Toggle spin</button>
+    <button id="reset">Reset view</button>
+  </div>
+
+  <script type="importmap">__IMPORTMAP__</script>
+  <script type="module">
+    import { createViewer } from './viewer.js';
+
+    const CONFIG = __CONFIG__;
+    const MODEL_URL = __MODEL_URL__;
+
+    const container = document.getElementById('viewer');
+    const loading = document.getElementById('loading');
+
+    createViewer({ container, config: CONFIG, modelUrl: MODEL_URL }).then((viewer) => {
+      loading.remove();
+      let spinning = CONFIG.animation?.enabled && CONFIG.animation.type === 'turntable';
+      const home = viewer.camera.position.clone();
+
+      document.getElementById('snap').onclick =
+        () => viewer.snapshot(`${CONFIG.name || 'view'}.png`);
+
+      document.getElementById('spin').onclick = () => {
+        spinning = !spinning;
+        viewer.model.userData.spin = spinning;
+        // createViewer drives the spin from the config, so mirror it there.
+        CONFIG.animation = CONFIG.animation || {};
+        CONFIG.animation.enabled = spinning;
+        CONFIG.animation.type = 'turntable';
+      };
+
+      document.getElementById('reset').onclick = () => {
+        viewer.camera.position.copy(home);
+        viewer.controls.update();
+      };
+    }).catch((err) => {
+      loading.textContent = `Could not load: ${err.message}`;
+      console.error(err);
+    });
+  </script>
+</body>
+</html>
