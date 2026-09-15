@@ -132,6 +132,51 @@ try {
     `${cut.stats.shadowDark.toLocaleString()} dark partial-alpha pixels`);
 
   await r.close();
+
+  // ── loading from picked files, with blob: fetch refused ───────────────────
+  //
+  // A sandboxed page allows images from blob: URLs but refuses fetch() of one.
+  // That is invisible on normal hosting, so it is reproduced here rather than
+  // waited for in production: geometry must still load, and textures with it.
+  console.log('\nLoading (blob: fetch refused, as in a sandboxed page)');
+  const sandbox = await browser.newContext();
+  await sandbox.addInitScript(() => {
+    const real = window.fetch;
+    window.fetch = function (input, init) {
+      const u = typeof input === 'string' ? input : input?.url || '';
+      if (u.startsWith('blob:')) return Promise.reject(new TypeError('Load failed'));
+      return real.call(this, input, init);
+    };
+  });
+  const sp = await sandbox.newPage();
+  sp.on('pageerror', (e) => errors.push(e.message));
+  await sp.goto(`${server.origin}/index.html`, { waitUntil: 'load' });
+  await sp.waitForFunction('window.studio && window.studio.engine', { timeout: 30000 });
+  await sp.waitForTimeout(2500);
+
+  const { readFileSync } = await import('node:fs');
+  const payload = [
+    'examples/test-model/testobject.obj',
+    'examples/test-model/testobject.mtl',
+    'examples/test-model/textures/body_diffuse.png'
+  ].map((p) => ({ name: p.split('/').pop(), b64: readFileSync(p).toString('base64') }));
+
+  const loaded = await sp.evaluate(async (payload) => {
+    const files = payload.map(({ name, b64 }) => {
+      const bin = atob(b64);
+      const arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      return new File([arr], name);
+    });
+    await window.studio.handleFiles(files);
+    const st = window.studio.engine.modelStats;
+    return { tris: st?.triangles ?? 0, tex: st?.textureCount ?? 0, toast: document.getElementById('toast').textContent };
+  }, payload);
+
+  check('model loads without fetching blob: URLs', loaded.tris > 1000,
+    loaded.tris > 1000 ? `${loaded.tris.toLocaleString()} triangles` : loaded.toast);
+  check('its textures survive that too', loaded.tex > 0, `${loaded.tex} textures`);
+  await sandbox.close();
 } finally {
   await browser.close();
   await server.close();

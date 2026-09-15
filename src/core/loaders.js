@@ -12,6 +12,35 @@ export const SUPPORTED_EXTENSIONS = ['obj', 'mtl', 'gltf', 'glb', 'fbx', 'stl', 
 export const TEXTURE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tga', 'tif', 'tiff', 'gif', 'ktx2', 'hdr', 'exr'];
 
 const ext = (name) => String(name).split('.').pop().toLowerCase();
+
+/**
+ * Can this page `fetch()` a `blob:` URL?
+ *
+ * A sandboxed page's content policy typically allows images from `blob:` but
+ * refuses `fetch()` of one, and the only symptom is a bare "Load failed". Two
+ * things in the loading path care: three's `FileLoader`, and the
+ * `ImageBitmapLoader` that `GLTFLoader` prefers for embedded textures.
+ *
+ * Rather than infer this from the host, ask the browser once and cache the
+ * answer — the environments differ in ways no feature flag captures.
+ */
+let _blobFetchProbe;
+export function canFetchBlobURLs() {
+  if (_blobFetchProbe) return _blobFetchProbe;
+  _blobFetchProbe = (async () => {
+    if (typeof Blob === 'undefined' || typeof URL?.createObjectURL !== 'function') return false;
+    const url = URL.createObjectURL(new Blob([new Uint8Array([0])]));
+    try {
+      await fetch(url);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  })();
+  return _blobFetchProbe;
+}
 const stem = (name) => String(name).split('/').pop().replace(/\.[^.]+$/, '');
 
 /**
@@ -88,10 +117,29 @@ export function createAssetManager(fileMap = {}) {
 }
 
 /**
- * Load a model. `files` maps relative path -> URL (blob: or http:).
- * Returns { object, format, stats, warnings }.
+ * Load a model.
+ *
+ * Two routes, and the first is preferred:
+ *
+ *  - **From memory.** When the caller passes the actual `File` objects, the
+ *    bytes are read directly and handed to the loader's `parse()` method. No
+ *    network request is made for the model at all.
+ *  - **From a URL**, for the headless renderer, which serves files over http.
+ *
+ * The in-memory route exists because three's `FileLoader` fetches, and a
+ * sandboxed page's content policy does not generally allow `fetch()` of a
+ * `blob:` URL — which fails with nothing more useful than "Load failed". A
+ * file the user just picked is already in memory; round-tripping it through
+ * the network layer only creates a way for it to fail.
+ *
+ * @param {object}  opts
+ * @param {string}  opts.url      URL of the model (used by the URL route)
+ * @param {string}  opts.name     filename, which decides the format
+ * @param {object}  opts.files    path -> URL, for resolving textures
+ * @param {object}  [opts.fileObjects] path -> File, enabling the memory route
+ * @returns {Promise<{object: THREE.Object3D, format: string, stats: object, warnings: string[]}>}
  */
-export async function loadModel({ url, name, files = {}, onProgress } = {}) {
+export async function loadModel({ url, name, files = {}, fileObjects = null, onProgress } = {}) {
   const format = ext(name || url);
   const manager = createAssetManager(files);
   const warnings = [];
@@ -101,54 +149,70 @@ export async function loadModel({ url, name, files = {}, onProgress } = {}) {
     if (onProgress && e && e.lengthComputable) onProgress(e.loaded / e.total);
   };
 
+  // The primary file's bytes, when the caller supplied them.
+  const primary = fileObjects ? findFile(fileObjects, name) : null;
+  const readText = async () => (primary ? primary.text() : null);
+  const readBuffer = async () => (primary ? primary.arrayBuffer() : null);
+
   switch (format) {
     case 'obj': {
-      // Find a sibling MTL. Prefer one with the same stem, else the only one present.
-      const mtlEntries = Object.entries(files).filter(([p]) => ext(p) === 'mtl');
-      let materials = null;
-      if (mtlEntries.length) {
-        const same = mtlEntries.find(([p]) => stem(p) === stem(name || url));
-        const [mtlPath, mtlUrl] = same || mtlEntries[0];
-        try {
-          const mtlLoader = new MTLLoader(manager);
-          mtlLoader.setMaterialOptions({ side: THREE.FrontSide, invertTrProperty: false });
-          const mtl = await mtlLoader.loadAsync(mtlUrl, progress);
-          mtl.preload();
-          materials = mtl;
-        } catch (err) {
-          warnings.push(`Could not parse ${mtlPath.split('/').pop()}: ${err.message}. Loading geometry without materials.`);
-        }
-      } else {
-        warnings.push('No .mtl file found — the model will load with a default grey material. Drop the .mtl and its textures in alongside the .obj to get the authored look.');
-      }
+      const materials = await loadOBJMaterials({ files, fileObjects, name, manager, warnings, progress });
       const objLoader = new OBJLoader(manager);
       if (materials) objLoader.setMaterials(materials);
-      object = await objLoader.loadAsync(url, progress);
+      const text = await readText();
+      object = text !== null ? objLoader.parse(text) : await objLoader.loadAsync(url, progress);
       break;
     }
     case 'gltf':
     case 'glb': {
       const loader = new GLTFLoader(manager);
-      const gltf = await loader.loadAsync(url, progress);
+      if (!(await canFetchBlobURLs())) {
+        // GLTFLoader prefers ImageBitmapLoader, which fetches the blob: URLs it
+        // makes for embedded textures. Where that is refused the geometry still
+        // arrives and every texture silently vanishes, so swap in the loader
+        // that goes through an <img> instead. A plugin callback runs just after
+        // the parser is built, which is the supported place to do this.
+        loader.register((parser) => {
+          parser.textureLoader = new THREE.TextureLoader(parser.options.manager);
+          return { name: 'texture-loader-without-fetch' };
+        });
+      }
+      const buffer = await readBuffer();
+      let gltf;
+      if (buffer) {
+        // parse() takes the GLB container directly, or the .gltf JSON as text.
+        const data = format === 'glb' ? buffer : new TextDecoder().decode(buffer);
+        gltf = await new Promise((resolve, reject) => loader.parse(data, '', resolve, reject));
+      } else {
+        gltf = await loader.loadAsync(url, progress);
+      }
       object = gltf.scene || gltf.scenes[0];
       object.animations = gltf.animations || [];
       break;
     }
     case 'fbx': {
-      object = await new FBXLoader(manager).loadAsync(url, progress);
+      const loader = new FBXLoader(manager);
+      const buffer = await readBuffer();
+      object = buffer ? loader.parse(buffer, '') : await loader.loadAsync(url, progress);
       break;
     }
     case 'dae': {
-      const dae = await new ColladaLoader(manager).loadAsync(url, progress);
+      const loader = new ColladaLoader(manager);
+      const text = await readText();
+      const dae = text !== null ? loader.parse(text, '') : await loader.loadAsync(url, progress);
       object = dae.scene;
       break;
     }
     case '3mf': {
-      object = await new ThreeMFLoader(manager).loadAsync(url, progress);
+      const loader = new ThreeMFLoader(manager);
+      const buffer = await readBuffer();
+      object = buffer ? loader.parse(buffer) : await loader.loadAsync(url, progress);
       break;
     }
     case 'stl': {
-      const geom = await new STLLoader(manager).loadAsync(url, progress);
+      const loader = new STLLoader(manager);
+      const buffer = await readBuffer();
+      const geom = buffer ? loader.parse(buffer) : await loader.loadAsync(url, progress);
       geom.computeVertexNormals();
       object = new THREE.Group();
       object.add(new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.6, metalness: 0.0 })));
@@ -156,7 +220,9 @@ export async function loadModel({ url, name, files = {}, onProgress } = {}) {
       break;
     }
     case 'ply': {
-      const geom = await new PLYLoader(manager).loadAsync(url, progress);
+      const loader = new PLYLoader(manager);
+      const buffer = await readBuffer();
+      const geom = buffer ? loader.parse(buffer) : await loader.loadAsync(url, progress);
       if (!geom.attributes.normal) geom.computeVertexNormals();
       const hasColor = Boolean(geom.attributes.color);
       object = new THREE.Group();
@@ -170,15 +236,17 @@ export async function loadModel({ url, name, files = {}, onProgress } = {}) {
   }
 
   if (!object) throw new Error('The file loaded but produced no geometry.');
+  object.name = object.name || stem(name || url);
 
   // Each loader reports clips differently — GLTF hands them back beside the
   // scene, FBX and Collada attach them to the root. Normalise so the rest of
   // the engine has one place to look.
   const clips = object.animations || [];
   object.userData.animations = clips;
-  object.name = object.name || stem(name || url);
+
   const stats = analyse(object);
   stats.clips = clips.map((c) => ({ name: c.name || 'clip', duration: +c.duration.toFixed(3) }));
+
   if (stats.triangles === 0) warnings.push('The file contains no triangles — it may be a point cloud or an empty scene.');
   if (!stats.hasUVs && stats.hasTextures) warnings.push('Textures were found but the mesh has no UV coordinates, so they cannot be applied.');
   if (clips.length) {
@@ -190,6 +258,49 @@ export async function loadModel({ url, name, files = {}, onProgress } = {}) {
   if (stats.triangles > 3_000_000) warnings.push(`${stats.triangles.toLocaleString()} triangles is heavy. Real-time preview may be slow; the path tracer will still work but expect longer builds.`);
 
   return { object, format, stats, warnings };
+}
+
+/** Find a file in the map by exact path, then by basename. */
+function findFile(fileObjects, name) {
+  if (!fileObjects || !name) return null;
+  const want = String(name).split(/[\\/]/).pop().toLowerCase();
+  for (const [path, file] of Object.entries(fileObjects)) {
+    if (path.split(/[\\/]/).pop().toLowerCase() === want) return file;
+  }
+  return null;
+}
+
+/**
+ * The .mtl that belongs to an .obj. Prefers a file with the same stem, since a
+ * folder can hold several, and falls back to the only one present.
+ */
+async function loadOBJMaterials({ files, fileObjects, name, manager, warnings, progress }) {
+  const entries = Object.entries(files).filter(([p]) => ext(p) === 'mtl');
+  const objects = fileObjects
+    ? Object.entries(fileObjects).filter(([p]) => ext(p) === 'mtl')
+    : [];
+
+  if (!entries.length && !objects.length) {
+    warnings.push('No .mtl file found — the model will load with a default grey material. Select the .mtl and its textures alongside the .obj to get the authored look.');
+    return null;
+  }
+
+  const sameStem = (list) => list.find(([p]) => stem(p) === stem(name || '')) || list[0];
+  const chosen = objects.length ? sameStem(objects) : sameStem(entries);
+  const label = chosen[0].split('/').pop();
+
+  try {
+    const mtlLoader = new MTLLoader(manager);
+    mtlLoader.setMaterialOptions({ side: THREE.FrontSide, invertTrProperty: false });
+    const mtl = objects.length
+      ? mtlLoader.parse(await chosen[1].text(), '')
+      : await mtlLoader.loadAsync(chosen[1], progress);
+    mtl.preload();
+    return mtl;
+  } catch (err) {
+    warnings.push(`Could not parse ${label}: ${err.message}. Loading geometry without materials.`);
+    return null;
+  }
 }
 
 /** Walk the object and collect useful facts about it. */

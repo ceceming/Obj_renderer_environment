@@ -119,8 +119,8 @@ export class RenderEngine {
 
   // ── model ─────────────────────────────────────────────────────────────────
 
-  async loadModelFrom({ url, name, files, onProgress }) {
-    const result = await loadModel({ url, name, files, onProgress });
+  async loadModelFrom({ url, name, files, fileObjects, onProgress }) {
+    const result = await loadModel({ url, name, files, fileObjects, onProgress });
     this.setModel(result.object, result.stats, result.warnings);
     this.config.name = (name || 'model').replace(/\.[^.]+$/, '');
     return result;

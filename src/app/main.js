@@ -3,7 +3,7 @@ import { RenderEngine, DIRTY } from '../core/engine.js';
 import { defaultConfig, mergeConfig, fromJSON, RESOLUTION_PRESETS, validate } from '../core/schema.js';
 import { buildPanels, renderLightList, renderClipPicker } from './ui/panels.js';
 import { el } from './ui/controls.js';
-import { SUPPORTED_EXTENSIONS, TEXTURE_EXTENSIONS } from '../core/loaders.js';
+import { SUPPORTED_EXTENSIONS, TEXTURE_EXTENSIONS, canFetchBlobURLs } from '../core/loaders.js';
 import { getLightingPreset } from '../core/presets/lighting.js';
 import { ANGLE_SETS } from '../core/presets/cameras.js';
 import { AnimationDriver, frameCount, evaluateFrame } from '../core/animation.js';
@@ -228,15 +228,25 @@ class Studio {
    */
   async handleFiles(files) {
     if (!files.length) return;
+    // Where blob: URLs cannot be fetched, textures travel as data: URLs
+    // instead — an <img> accepts those everywhere.
+    const blobsUsable = await canFetchBlobURLs();
     const urls = {};
+    const fileObjects = {};
     let modelFile = null;
     let bestRank = 99;
     const rank = { glb: 0, gltf: 1, obj: 2, fbx: 3, dae: 4, '3mf': 5, stl: 6, ply: 7 };
 
     for (const file of files) {
       const path = file.webkitRelativePath || file.name;
-      urls[path] = URL.createObjectURL(file);
+      fileObjects[path] = file;
       const ext = file.name.split('.').pop().toLowerCase();
+      // Textures reach the GPU through an <img>, which a sandboxed page's
+      // content policy allows as a data: URL but not always as a blob:. The
+      // model itself never needs a URL — it is parsed straight from memory.
+      urls[path] = !blobsUsable && TEXTURE_EXTENSIONS.includes(ext)
+        ? await fileToDataURL(file)
+        : URL.createObjectURL(file);
       if (ext in rank && rank[ext] < bestRank) { bestRank = rank[ext]; modelFile = { file, path }; }
     }
 
@@ -250,7 +260,8 @@ class Studio {
       const result = await this.engine.loadModelFrom({
         url: urls[modelFile.path],
         name: modelFile.file.name,
-        files: urls
+        files: urls,
+        fileObjects
       });
       this.showStats(result.stats, result.warnings);
       renderClipPicker(this, this.engine);
@@ -259,7 +270,7 @@ class Studio {
       this.toast(`Loaded ${modelFile.file.name}`);
     } catch (err) {
       console.error(err);
-      this.toast(`Could not load: ${err.message}`, 'warn');
+      this.toast(describeLoadFailure(err, modelFile.file.name), 'warn');
     } finally {
       this.setBusy(null);
     }
@@ -921,6 +932,28 @@ class Studio {
 // ── helpers ─────────────────────────────────────────────────────────────────
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+const fileToDataURL = (file) => new Promise((resolve, reject) => {
+  const r = new FileReader();
+  r.onload = () => resolve(r.result);
+  r.onerror = () => reject(r.error);
+  r.readAsDataURL(file);
+});
+
+/**
+ * Turn a loader failure into something actionable.
+ *
+ * "Load failed" is all Safari reports when a fetch is refused, which tells the
+ * person nothing about what to do next.
+ */
+function describeLoadFailure(err, filename) {
+  const message = String(err?.message || err);
+  if (/load failed|failed to fetch|networkerror/i.test(message)) {
+    return `Could not read ${filename}. If it references separate files — a .gltf with its .bin, for instance — ` +
+           'select them all together, or use a single-file .glb.';
+  }
+  return `Could not load ${filename}: ${message}`;
+}
 const wrap180 = (a) => { a = ((a + 180) % 360 + 360) % 360 - 180; return a; };
 
 /** Recursively read a dropped folder, so an entire model directory works. */
