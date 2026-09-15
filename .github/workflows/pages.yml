@@ -3,7 +3,14 @@
 # Gives you a permanent URL you can open on any device — including an iPad —
 # without needing a computer to run `npm start`.
 #
-# To switch it on: repository Settings -> Pages -> Source: "GitHub Actions".
+# The workflow sets the Pages source itself (see `enablement` below), so there
+# is normally nothing to configure. If it still fails, set it by hand:
+# Settings -> Pages -> Source: "GitHub Actions".
+#
+# Note it must be "GitHub Actions", not "Deploy from a branch". Branch
+# deployment serves the repository root, where index.html is Vite's development
+# entry point — it references unbundled source and will not run in a browser.
+#
 # (On a private repository, Pages needs a paid plan. If yours is private and
 # you would rather not make it public, drag the `dist` folder onto
 # app.netlify.com/drop instead — it hosts private static sites for free.)
@@ -42,7 +49,14 @@ jobs:
 
       - run: npm run build
 
+      # `enablement` lets the workflow switch Pages onto the GitHub Actions
+      # source itself. Without it, a repository still set to "Deploy from a
+      # branch" fails here with "Get Pages site failed ... Not Found", and the
+      # legacy builder quietly serves the repository root instead — which is
+      # Vite's dev entry point, referencing unbundled source no browser can run.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
