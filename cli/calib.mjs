@@ -7,20 +7,22 @@
  * statistics the way a framed crop does. Reports the brightness distribution
  * across the lit surface and how much of it is clipped.
  *
- *   node calib.mjs [model.obj]
+ *   npm run calibrate            (or: node cli/calib.mjs [model.obj])
  */
-import { startServer } from './cli/server.mjs';
-import { launchChromium } from './cli/browser.mjs';
+import { startServer } from './server.mjs';
+import { launchChromium } from './browser.mjs';
 import { chromium } from 'playwright';
-import { dirname, basename, resolve } from 'node:path';
-import { defaultConfig, mergeConfig } from './src/core/schema.js';
-import { getLightingPreset } from './src/core/presets/lighting.js';
+import { dirname, basename, resolve, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { defaultConfig, mergeConfig } from '../src/core/schema.js';
+import { getLightingPreset } from '../src/core/presets/lighting.js';
 
-const model = resolve(process.argv[2] || 'examples/test-model/testobject.obj');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const model = resolve(process.argv[2] || join(ROOT, 'examples/test-model/testobject.obj'));
 const sweep = (process.argv[3] || '1,0.7,0.5,0.35,0.25').split(',').map(Number);
 const preset = process.argv[4] || 'studio-softbox';
 
-const server = await startServer({ appRoot: 'dist', assetRoots: { model: dirname(model) } });
+const server = await startServer({ appRoot: join(ROOT, 'dist'), assetRoots: { model: dirname(model) } });
 const { browser } = await launchChromium(chromium);
 const page = await browser.newPage();
 page.on('pageerror', e => console.log('PAGEERROR', e.message));

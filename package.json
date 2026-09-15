@@ -12,7 +12,8 @@
     "render": "node cli/render.mjs",
     "postinstall": "node cli/check-env.mjs",
     "smoke": "node cli/smoke.mjs",
-    "build:artifact": "vite build && node cli/build-artifact.mjs"
+    "build:artifact": "vite build && node cli/build-artifact.mjs",
+    "calibrate": "node cli/calib.mjs"
   },
   "dependencies": {
     "three": "^0.186.0",

@@ -30,7 +30,7 @@ const DEG = Math.PI / 180;
  * leaves the tone mapper bleaching everything to white regardless of albedo.
  *
  * This factor converts the readable numbers into physically sane radiance. It
- * is set by `calib.mjs`, which renders a white-clay reference (albedo 0.94) on
+ * is set by `cli/calib.mjs`, which renders a white-clay reference (albedo 0.94) on
  * a transparent background — so the subject can be isolated by its alpha — and
  * measures the brightness distribution across it. The level is chosen so the
  * 99th percentile of a white surface sits just below clipping: white reads as

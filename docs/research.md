@@ -209,7 +209,7 @@ where overexposure reads as "bright and glossy". A white surface is what exposes
 it: white clay came out as a featureless silhouette, 77% of it clipped.
 
 The fix was to re-run the calibration on correct geometry and, more usefully, to
-make the measurement honest: `calib.mjs` now renders the reference on a
+make the measurement honest: `cli/calib.mjs` now renders the reference on a
 transparent background and uses the alpha channel to measure the *subject only*,
 reporting the brightness distribution and clipped fraction rather than a couple
 of hand-placed probe points that could miss the peaks entirely.

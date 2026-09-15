@@ -12,7 +12,8 @@ name: Deploy studio to Pages
 
 on:
   push:
-    branches: [main, 'claude/**']
+    branches: [main]
+  # Deploy any other branch on demand from the Actions tab.
   workflow_dispatch:
 
 permissions:
