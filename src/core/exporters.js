@@ -211,7 +211,45 @@ export async function zipFiles(entries, { comment } = {}) {
 
 // ── Browser download helper ─────────────────────────────────────────────────
 
-export function download(blob, filename) {
+/**
+ * Hand a finished file to the user.
+ *
+ * Two routes, because the same build runs in two very different places:
+ *
+ *  - Served normally (locally, or from static hosting), an anchor with a
+ *    `download` attribute is the direct route.
+ *  - Inside a sandboxed viewer — a published Artifact, say — page-initiated
+ *    downloads are blocked outright, and the host instead offers a save
+ *    capability that prompts the viewer. Without this branch, every export
+ *    button in such a page would silently do nothing.
+ *
+ * Resolves to a short status the caller can report: 'saved', 'declined',
+ * 'unsupported' (the sandbox will not accept that file type), or 'error'.
+ */
+export async function download(blob, filename) {
+  const host = await hostDownloads();
+
+  if (host) {
+    try {
+      const result = await host.save({ filename, data: blob });
+      return { status: result?.status === 'delivered' ? 'saved' : 'saved' };
+    } catch (err) {
+      const code = err?.code || 'error';
+      if (code === 'declined') return { status: 'declined' };
+      if (code === 'rejected_extension' || code === 'extension_not_enabled') {
+        return {
+          status: 'unsupported',
+          message: `This viewer will not accept a .${filename.split('.').pop()} file. ` +
+                   'Run the studio locally, or from your own hosting, to export that format.'
+        };
+      }
+      if (code === 'too_large') {
+        return { status: 'error', message: 'That file is too large for this viewer. Try a smaller resolution.' };
+      }
+      return { status: 'error', message: err?.message || String(err) };
+    }
+  }
+
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -220,4 +258,26 @@ export function download(blob, filename) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
+  return { status: 'saved' };
+}
+
+/** File types a sandboxed host will accept. Others need the local app. */
+export const SANDBOX_SAVEABLE = new Set([
+  'png', 'jpg', 'jpeg', 'webp', 'gif', 'mp4', 'webm',
+  'txt', 'json', 'md', 'csv', 'html', 'svg', 'pdf', 'zip'
+]);
+
+let _hostDownloads;
+function hostDownloads() {
+  if (_hostDownloads !== undefined) return _hostDownloads;
+  const use = globalThis.claude?.use;
+  _hostDownloads = typeof use === 'function'
+    ? Promise.resolve(use.call(globalThis.claude, 'downloads')).catch(() => null)
+    : Promise.resolve(null);
+  return _hostDownloads;
+}
+
+/** True when the page cannot start its own downloads (sandboxed viewer). */
+export async function isSandboxedHost() {
+  return Boolean(await hostDownloads());
 }

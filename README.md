@@ -15,6 +15,10 @@ npm start          # opens the studio at http://127.0.0.1:5173
 
 Then drag your model onto the viewport.
 
+**No computer to hand?** The studio is a browser application — it runs on an
+iPad, in Safari, with no install. See [Running it without a
+computer](#running-it-without-a-computer).
+
 ---
 
 ## What this is for
@@ -76,6 +80,47 @@ Loads the studio, verifies the interface builds and runs clean, then renders a
 still and a transparent cut-out headlessly and inspects the resulting pixels —
 that the subject is actually shaded, that the background is transparent, and that
 the grounding shadow made it into the alpha channel.
+
+---
+
+## Running it without a computer
+
+The studio needs a browser, not a toolchain, so it runs anywhere — including an
+iPad. Only the command-line renderer needs Node.
+
+Three ways to reach it:
+
+| | How | Good for |
+|---|---|---|
+| **Locally** | `npm start` | Everything. The only route that supports EXR, GLB and the CLI. |
+| **GitHub Pages** | Settings → Pages → Source: *GitHub Actions*. The included workflow builds and deploys on every push. | A permanent URL of your own, on any device. Private repos need a paid plan — otherwise drop the `dist` folder on [netlify.com/drop](https://app.netlify.com/drop). |
+| **A hosted viewer** | A published page | Opening it immediately on a tablet. Saving goes through the host's prompt; EXR and GLB are not accepted there. |
+
+### On an iPad
+
+Works: the full studio, all 25 lighting rigs, the path tracer, and PNG / JPEG /
+WebP / frame-sequence ZIP / interactive HTML / config exports.
+
+- With a **mouse and keyboard** attached, everything behaves as on a desktop —
+  scroll to zoom, shift-drag to pan, alt-drag to spin the lights, and the
+  keyboard shortcuts all work.
+- With **touch alone**: one finger orbits, two fingers pan and pinch-zoom, and
+  the *Drag: camera / lights* button in the toolbar swaps what a single finger
+  does — there being no alt key to hold.
+
+Two limits worth knowing:
+
+- **Keep renders at or below 2048px.** Safari caps how much memory a tab may
+  hold, and the post-processing chain keeps several full-resolution HDR buffers
+  — around 134 MB each at 4K. The studio warns before a render that would risk
+  it, and refuses above 4096px. For poster sizes, use a computer.
+- **No folder picking.** iOS has no directory upload, so select the `.obj`,
+  its `.mtl` and its textures together in the file picker. Textures are matched
+  by filename, so the folder structure does not matter.
+
+The **command-line renderer does not run on iPad** — that means no MP4/GIF
+encoding, no overnight batch renders, and no EXR. Frame sequences still export
+from the browser as a ZIP, ready to assemble later.
 
 ---
 

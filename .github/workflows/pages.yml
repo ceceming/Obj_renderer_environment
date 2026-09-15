@@ -1,0 +1,58 @@
+# Publish the studio to GitHub Pages.
+#
+# Gives you a permanent URL you can open on any device — including an iPad —
+# without needing a computer to run `npm start`.
+#
+# To switch it on: repository Settings -> Pages -> Source: "GitHub Actions".
+# (On a private repository, Pages needs a paid plan. If yours is private and
+# you would rather not make it public, drag the `dist` folder onto
+# app.netlify.com/drop instead — it hosts private static sites for free.)
+
+name: Deploy studio to Pages
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # The postinstall environment check probes for ffmpeg and browsers, which
+      # are irrelevant to a static build and only add noise here.
+      - run: npm ci --ignore-scripts
+
+      - run: npm run build
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

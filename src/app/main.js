@@ -8,11 +8,23 @@ import { getLightingPreset } from '../core/presets/lighting.js';
 import { ANGLE_SETS } from '../core/presets/cameras.js';
 import { AnimationDriver, frameCount, evaluateFrame } from '../core/animation.js';
 import {
-  captureStill, exportConfig, exportGLB, zipFiles, download, frameName, sanitize
+  captureStill, exportConfig, exportGLB, zipFiles, download, frameName, sanitize,
+  isSandboxedHost
 } from '../core/exporters.js';
 import { exportSingleFileHTML, exportProjectZip } from '../core/embed.js';
 
 const MAX_PREVIEW_PX = 1600;   // keep the viewport responsive at any output size
+
+/**
+ * Safari on iPad enforces a per-tab memory ceiling and discards the tab when it
+ * is crossed, with no recoverable error. The post chain keeps several
+ * half-float RGBA targets at full resolution — around 134 MB each at 4K — so a
+ * large render is the realistic way to hit that ceiling. These budgets keep the
+ * preview well inside it and warn before an export goes past it.
+ */
+const IOS_PREVIEW_PX = 1100;
+const IOS_SAFE_EXPORT_PX = 2048;
+const IOS_MAX_EXPORT_PX = 4096;
 
 class Studio {
   constructor() {
@@ -22,6 +34,13 @@ class Studio {
     this.rail = document.getElementById('rail');
     this.engine = new RenderEngine(this.canvas, { pixelRatio: Math.min(2, window.devicePixelRatio || 1) });
     this.selectedLight = null;
+    // What a single finger does. Irrelevant with a mouse (shift/alt still work),
+    // but on a bare touchscreen there are no modifier keys to hold.
+    this.touchMode = 'orbit';
+    this.isTouch = matchMedia('(hover: none)').matches || navigator.maxTouchPoints > 1;
+    // iPadOS reports itself as a Mac, so the touch-point count is the reliable tell.
+    this.isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     this.playing = false;
     this.previewFrame = 0;
     this.needsRender = true;
@@ -49,6 +68,25 @@ class Studio {
     this.loop();
     this.updateStatus();
     this.restoreSession();
+    this.reportEnvironment();
+  }
+
+  /**
+   * Say once, up front, what this particular device and host cannot do — so a
+   * limitation is discovered now rather than after a long render.
+   */
+  async reportEnvironment() {
+    const notes = [];
+    if (await isSandboxedHost()) {
+      notes.push('Running in a hosted viewer: PNG, JPEG, WebP, ZIP, HTML and config exports all work. ' +
+                 'EXR and GLB need the studio run locally.');
+    }
+    if (this.isIOS) {
+      notes.push(`On iPad, keep renders at or below ${IOS_SAFE_EXPORT_PX}px — Safari limits how much memory a tab may hold.`);
+    }
+    if (!notes.length) return;
+    const host = this.warnEl;
+    if (host) for (const n of notes) host.append(el('div', { class: 'notice info', text: n }));
   }
 
   // ── config plumbing ───────────────────────────────────────────────────────
@@ -269,8 +307,9 @@ class Studio {
 
     // Render at the output resolution when it is small enough to stay smooth,
     // otherwise at a capped preview size with the same framing.
+    const previewCap = this.isIOS ? IOS_PREVIEW_PX : MAX_PREVIEW_PX;
     const longest = Math.max(cfg.render.width, cfg.render.height);
-    const scale = longest > MAX_PREVIEW_PX ? MAX_PREVIEW_PX / longest : 1;
+    const scale = longest > previewCap ? previewCap / longest : 1;
     const rw = Math.max(16, Math.round(cfg.render.width * scale));
     const rh = Math.max(16, Math.round(cfg.render.height * scale));
 
@@ -340,70 +379,146 @@ class Studio {
   // ── interaction ───────────────────────────────────────────────────────────
 
   bindStage() {
-    let dragging = false, lastX = 0, lastY = 0, mode = 'orbit';
+    // Multi-pointer interaction, so the same code serves a mouse and a
+    // touchscreen. Pointer events cover both; what a tablet lacks is a scroll
+    // wheel and modifier keys, so those roles move onto gestures:
+    //
+    //   one finger / drag     orbit  (or spin the lights, per the mode toggle)
+    //   two fingers           pan and pinch-zoom together
+    //   shift-drag / middle   pan
+    //   alt-drag / right      spin the lights
+    //
+    const pointers = new Map();
+    let mode = 'orbit';
+    let lastX = 0, lastY = 0;
+    let pinchDistance = 0, pinchCentre = null;
+
+    const centreOf = () => {
+      let x = 0, y = 0;
+      for (const p of pointers.values()) { x += p.x; y += p.y; }
+      return { x: x / pointers.size, y: y / pointers.size };
+    };
+    const spreadOf = () => {
+      const [a, b] = [...pointers.values()];
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    };
+
+    const orbitBy = (dx, dy) => {
+      const cfg = this.engine.config;
+      this.engine.patch({ camera: {
+        azimuth: wrap180(cfg.camera.azimuth - dx * 0.35),
+        elevation: clamp(cfg.camera.elevation + dy * 0.3, -89, 89)
+      } });
+      this.engine.invalidate(DIRTY.CAMERA);
+    };
+    const panBy = (dx, dy) => {
+      const cfg = this.engine.config;
+      this.engine.patch({ camera: {
+        targetMode: 'manual',
+        target: {
+          ...cfg.camera.target,
+          y: clamp((cfg.camera.target.y ?? 0.5) + dy * 0.0015, -1, 2),
+          x: (cfg.camera.target.x ?? 0) - dx * 0.0015
+        }
+      } });
+      this.engine.invalidate(DIRTY.CAMERA);
+    };
+    const spinLightsBy = (dx) => {
+      const cfg = this.engine.config;
+      this.engine.patch({ lighting: { envRotation: wrap180(cfg.lighting.envRotation - dx * 0.5) } });
+      this.engine.invalidate(DIRTY.LIGHTS);
+    };
+    const zoomBy = (factor) => {
+      const cfg = this.engine.config;
+      this.engine.patch({ camera: { framing: clamp(cfg.camera.framing * factor, 0.1, 4) } });
+      this.engine.invalidate(DIRTY.CAMERA);
+    };
+    const settle = () => {
+      this.engine.resetAccumulation();
+      this.requestRender();
+    };
 
     this.canvas.addEventListener('pointerdown', (e) => {
-      dragging = true;
-      mode = e.shiftKey || e.button === 1 ? 'pan' : e.altKey || e.button === 2 ? 'light' : 'orbit';
-      lastX = e.clientX; lastY = e.clientY;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       this.canvas.setPointerCapture(e.pointerId);
       e.preventDefault();
+
+      if (pointers.size === 1) {
+        mode = e.shiftKey || e.button === 1 ? 'pan'
+             : e.altKey || e.button === 2 ? 'light'
+             : this.touchMode;             // 'orbit' or 'light', set by the toggle
+        lastX = e.clientX; lastY = e.clientY;
+      } else if (pointers.size === 2) {
+        mode = 'pinch';
+        pinchDistance = spreadOf();
+        pinchCentre = centreOf();
+      }
     });
 
     this.canvas.addEventListener('pointermove', (e) => {
-      if (!dragging) return;
+      if (!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      e.preventDefault();
+
+      if (mode === 'pinch' && pointers.size === 2) {
+        const spread = spreadOf();
+        const centre = centreOf();
+        if (pinchDistance > 0) {
+          // Pinching apart enlarges the subject, which means framing goes up.
+          zoomBy(clamp(spread / pinchDistance, 0.5, 2));
+        }
+        panBy(centre.x - pinchCentre.x, centre.y - pinchCentre.y);
+        pinchDistance = spread;
+        pinchCentre = centre;
+        settle();
+        return;
+      }
+
+      if (pointers.size !== 1) return;
       const dx = e.clientX - lastX, dy = e.clientY - lastY;
       lastX = e.clientX; lastY = e.clientY;
-      const cfg = this.engine.config;
 
-      if (mode === 'orbit') {
-        this.engine.patch({ camera: {
-          azimuth: wrap180(cfg.camera.azimuth - dx * 0.35),
-          elevation: clamp(cfg.camera.elevation + dy * 0.3, -89, 89)
-        } });
-        this.engine.invalidate(DIRTY.CAMERA);
-      } else if (mode === 'pan') {
-        this.engine.patch({ camera: {
-          targetMode: 'manual',
-          target: {
-            ...cfg.camera.target,
-            y: clamp((cfg.camera.target.y ?? 0.5) + dy * 0.0015, -1, 2),
-            x: (cfg.camera.target.x ?? 0) - dx * 0.0015
-          }
-        } });
-        this.engine.invalidate(DIRTY.CAMERA);
-      } else {
-        // Alt-drag spins the lighting rig — the fastest way to hunt for a highlight.
-        this.engine.patch({ lighting: { envRotation: wrap180(cfg.lighting.envRotation - dx * 0.5) } });
-        this.engine.invalidate(DIRTY.LIGHTS);
-      }
-      this.engine.resetAccumulation();
-      this.requestRender();
+      if (mode === 'pan') panBy(dx, dy);
+      else if (mode === 'light') spinLightsBy(dx);
+      else orbitBy(dx, dy);
+      settle();
     });
 
-    const endDrag = (e) => {
-      if (!dragging) return;
-      dragging = false;
+    const endPointer = (e) => {
+      if (!pointers.has(e.pointerId)) return;
+      pointers.delete(e.pointerId);
       try { this.canvas.releasePointerCapture(e.pointerId); } catch { /* already released */ }
-      this.builder?.refresh();
-      this.saveSession();
+
+      if (pointers.size === 1) {
+        // Dropping from two fingers to one: resume single-finger orbit from
+        // where the remaining finger is, rather than jumping.
+        const [p] = [...pointers.values()];
+        lastX = p.x; lastY = p.y;
+        mode = this.touchMode;
+      } else if (pointers.size === 0) {
+        this.builder?.refresh();
+        this.saveSession();
+      }
     };
-    this.canvas.addEventListener('pointerup', endDrag);
-    this.canvas.addEventListener('pointercancel', endDrag);
+    this.canvas.addEventListener('pointerup', endPointer);
+    this.canvas.addEventListener('pointercancel', endPointer);
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
     this.canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
-      const cfg = this.engine.config;
-      const factor = e.deltaY > 0 ? 0.94 : 1.064;
-      this.engine.patch({ camera: { framing: clamp(cfg.camera.framing * factor, 0.1, 4) } });
-      this.engine.invalidate(DIRTY.CAMERA);
-      this.engine.resetAccumulation();
-      this.requestRender();
+      zoomBy(e.deltaY > 0 ? 0.94 : 1.064);
+      settle();
       this.builder?.refresh();
     }, { passive: false });
 
+    // Safari on iPadOS fires its own pinch as a gesture event and will zoom the
+    // whole page unless these are swallowed.
+    for (const name of ['gesturestart', 'gesturechange', 'gestureend']) {
+      this.canvas.addEventListener(name, (e) => e.preventDefault());
+    }
+
     window.addEventListener('resize', () => this.resize());
+    window.addEventListener('orientationchange', () => setTimeout(() => this.resize(), 250));
   }
 
   bindKeys() {
@@ -440,6 +555,19 @@ class Studio {
 
   bindTopbar() {
     document.getElementById('btn-open').addEventListener('click', () => this.pickFiles());
+
+    // On a touchscreen there is no alt key to hold, so single-finger drag needs
+    // a way to switch between moving the camera and moving the lights.
+    const touchBtn = document.getElementById('btn-touchmode');
+    if (this.isTouch) {
+      touchBtn.style.display = '';
+      touchBtn.addEventListener('click', () => {
+        this.touchMode = this.touchMode === 'orbit' ? 'light' : 'orbit';
+        touchBtn.textContent = this.touchMode === 'orbit' ? 'Drag: camera' : 'Drag: lights';
+        touchBtn.classList.toggle('primary', this.touchMode === 'light');
+      });
+    }
+
     document.getElementById('btn-export').addEventListener('click', () => this.exportNow());
     document.getElementById('btn-engine').addEventListener('click', (e) => {
       const next = this.engine.config.render.engine === 'raster' ? 'pathtrace' : 'raster';
@@ -511,15 +639,15 @@ class Studio {
 
   async exportStill() {
     const cfg = this.engine.config;
+    if (!this.confirmMemory(cfg)) return;
     this.setBusy('Rendering');
     try {
       const { restore } = await this.engine.renderAtSize(cfg.render.width, cfg.render.height, {
         onProgress: (p) => this.setProgress(p)
       });
       const { blob, filename } = await captureStill(this.engine, cfg);
-      download(blob, filename);
       await restore();
-      this.toast(`Saved ${filename} (${(blob.size / 1024 / 1024).toFixed(1)} MB)`);
+      await this.deliver(blob, filename);
     } catch (err) {
       console.error(err);
       this.toast(err.message, 'warn');
@@ -536,8 +664,7 @@ class Studio {
       ...this.engine.config,
       output: { ...this.engine.config.output, format: 'png' }
     });
-    download(blob, filename);
-    this.toast(`Saved ${filename}`);
+    await this.deliver(blob, filename);
   }
 
   /**
@@ -547,6 +674,7 @@ class Studio {
    */
   async exportSequence() {
     const cfg = this.engine.config;
+    if (!this.confirmMemory(cfg)) return;
     const total = frameCount(cfg);
     const driver = new AnimationDriver(this.engine).begin();
     const entries = [];
@@ -580,8 +708,7 @@ class Studio {
       ].join('\n');
 
       const zip = await zipFiles(entries, { comment: readme });
-      download(zip, `${sanitize(cfg.name)}-frames.zip`);
-      this.toast(`Saved ${total} frames (${(zip.size / 1024 / 1024).toFixed(1)} MB)`);
+      await this.deliver(zip, `${sanitize(cfg.name)}-frames.zip`, `${total} frames`);
     } catch (err) {
       console.error(err);
       this.toast(err.message, 'warn');
@@ -615,8 +742,7 @@ class Studio {
       this.engine.setConfig(cfg);
       this.engine.invalidate();
       const zip = await zipFiles(entries);
-      download(zip, `${sanitize(cfg.name)}-${setKey}.zip`);
-      this.toast(`Saved ${entries.length} views`);
+      await this.deliver(zip, `${sanitize(cfg.name)}-${setKey}.zip`, `${entries.length} views`);
     } catch (err) {
       console.error(err);
       this.toast(err.message, 'warn');
@@ -632,8 +758,7 @@ class Studio {
     this.setBusy('Building page');
     try {
       const { blob, filename, note } = await exportSingleFileHTML(this.engine, this.engine.config);
-      download(blob, filename);
-      this.toast(note || `Saved ${filename} — open it in any browser`);
+      await this.deliver(blob, filename, note || 'open it in any browser');
     } catch (err) { console.error(err); this.toast(err.message, 'warn'); }
     finally { this.setBusy(null); }
   }
@@ -642,8 +767,7 @@ class Studio {
     this.setBusy('Building project');
     try {
       const { blob, filename } = await exportProjectZip(this.engine, this.engine.config);
-      download(blob, filename);
-      this.toast(`Saved ${filename}`);
+      await this.deliver(blob, filename);
     } catch (err) { console.error(err); this.toast(err.message, 'warn'); }
     finally { this.setBusy(null); }
   }
@@ -652,16 +776,14 @@ class Studio {
     this.setBusy('Exporting GLB');
     try {
       const { blob, filename } = await exportGLB(this.engine, this.engine.config);
-      download(blob, filename);
-      this.toast(`Saved ${filename}`);
+      await this.deliver(blob, filename);
     } catch (err) { console.error(err); this.toast(err.message, 'warn'); }
     finally { this.setBusy(null); }
   }
 
-  exportConfigFile() {
+  async exportConfigFile() {
     const { blob, filename } = exportConfig(this.engine.config);
-    download(blob, filename);
-    this.toast(`Saved ${filename}`);
+    await this.deliver(blob, filename);
   }
 
   importConfigFile() {
@@ -685,6 +807,48 @@ class Studio {
   }
 
   // ── chrome ────────────────────────────────────────────────────────────────
+
+  /**
+   * Deliver a file and say what actually happened. In a sandboxed viewer the
+   * save is a prompt the person can decline, and some formats are refused
+   * outright, so "saved" must not be assumed.
+   */
+  /**
+   * Check a render is within what this device can survive.
+   * Returns false when the person decides not to go ahead.
+   */
+  confirmMemory(cfg) {
+    if (!this.isIOS) return true;
+    const longest = Math.max(cfg.render.width, cfg.render.height);
+    if (longest <= IOS_SAFE_EXPORT_PX) return true;
+
+    const est = Math.round((cfg.render.width * cfg.render.height * 8 * 5) / (1024 * 1024));
+    if (longest > IOS_MAX_EXPORT_PX) {
+      this.toast(
+        `${cfg.render.width}×${cfg.render.height} is beyond what Safari on iPad can hold ` +
+        `(roughly ${est} MB of render buffers). Reduce it to ${IOS_MAX_EXPORT_PX}px or less, ` +
+        'or render this one on a computer.', 'warn');
+      return false;
+    }
+    return confirm(
+      `${cfg.render.width}×${cfg.render.height} needs roughly ${est} MB of render buffers.\n\n` +
+      'Safari on iPad may discard the tab at this size and you would lose the session. ' +
+      `${IOS_SAFE_EXPORT_PX}px is comfortably safe.\n\nRender anyway?`
+    );
+  }
+
+  async deliver(blob, filename, note = '') {
+    const result = await download(blob, filename);
+    if (result.status === 'saved') {
+      const mb = blob.size / 1024 / 1024;
+      this.toast(`Saved ${filename}${mb >= 0.1 ? ` (${mb.toFixed(1)} MB)` : ''}${note ? ` — ${note}` : ''}`);
+    } else if (result.status === 'declined') {
+      this.toast('Save cancelled');
+    } else {
+      this.toast(result.message || `Could not save ${filename}`, 'warn');
+    }
+    return result;
+  }
 
   setBusy(text) {
     this.busy = Boolean(text);
