@@ -66,6 +66,17 @@ node cli/render.mjs --list                       # every preset key
 
 See [docs/cli.md](docs/cli.md) for the full option list.
 
+### Checking a change
+
+```bash
+npm run smoke
+```
+
+Loads the studio, verifies the interface builds and runs clean, then renders a
+still and a transparent cut-out headlessly and inspects the resulting pixels —
+that the subject is actually shaded, that the background is transparent, and that
+the grounding shadow made it into the alpha channel.
+
 ---
 
 ## The two renderers

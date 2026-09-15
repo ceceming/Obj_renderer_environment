@@ -10,7 +10,8 @@
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
     "render": "node cli/render.mjs",
-    "postinstall": "node cli/check-env.mjs"
+    "postinstall": "node cli/check-env.mjs",
+    "smoke": "node cli/smoke.mjs"
   },
   "dependencies": {
     "three": "^0.186.0",
