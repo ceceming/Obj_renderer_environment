@@ -1,0 +1,25 @@
+{
+  "name": "obj-render-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A physically-based rendering studio for OBJ/GLTF/FBX models: lighting moods, camera art direction, and production output (PNG w/ alpha, EXR, frame sequences, MP4, three.js embeds).",
+  "scripts": {
+    "start": "vite --host 127.0.0.1 --port 5173",
+    "dev": "vite --host 127.0.0.1 --port 5173",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4173",
+    "render": "node cli/render.mjs",
+    "postinstall": "node cli/check-env.mjs"
+  },
+  "dependencies": {
+    "three": "^0.186.0",
+    "three-mesh-bvh": "^0.9.15",
+    "three-gpu-pathtracer": "^0.0.24",
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "vite": "^7.1.0",
+    "playwright": "^1.63.0"
+  }
+}

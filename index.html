@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OBJ Render Studio</title>
+</head>
+<body>
+  <div id="app">
+    <header id="topbar">
+      <div class="brand">OBJ Render Studio <span>· physically based</span></div>
+      <button class="btn" id="btn-open">Open model</button>
+      <button class="btn" id="btn-engine" title="Toggle between real-time and path-traced rendering (P)">Real-time</button>
+      <div class="spacer"></div>
+      <button class="btn ghost" id="btn-reset" title="Reset all settings">Reset</button>
+      <button class="btn primary" id="btn-export" title="Render and save (Cmd/Ctrl+S)">Render &amp; save</button>
+    </header>
+
+    <aside id="rail"></aside>
+
+    <main id="stage">
+      <div id="canvas-wrap">
+        <canvas id="view"></canvas>
+        <div id="thirds"></div>
+        <div id="safe-frame"></div>
+      </div>
+      <div id="overlay">
+        <div class="badge busy" id="busy-badge" style="display:none"></div>
+        <div class="badge" id="toast" style="display:none"></div>
+      </div>
+      <div id="progress"><i id="progress-bar"></i></div>
+      <div id="drop-hint">
+        <div>
+          <div style="font-size:17px;margin-bottom:6px">Drop your model here</div>
+          <div style="opacity:.6">.obj with its .mtl and textures — or a whole folder.<br>
+          GLB, GLTF, FBX, STL, PLY, DAE and 3MF also work.</div>
+        </div>
+      </div>
+    </main>
+
+    <footer id="statusbar">
+      <span id="status-left"></span>
+      <span class="spacer"></span>
+      <span id="status-right"></span>
+      <span style="opacity:.6">
+        drag orbit · shift+drag pan · alt+drag spin lights · scroll zoom ·
+        <kbd>G</kbd> grid <kbd>F</kbd> frame <kbd>P</kbd> engine <kbd>space</kbd> play
+      </span>
+    </footer>
+  </div>
+  <script type="module" src="/src/app/main.js"></script>
+</body>
+</html>
