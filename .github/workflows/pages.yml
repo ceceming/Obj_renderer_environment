@@ -3,17 +3,18 @@
 # Gives you a permanent URL you can open on any device — including an iPad —
 # without needing a computer to run `npm start`.
 #
-# The workflow sets the Pages source itself (see `enablement` below), so there
-# is normally nothing to configure. If it still fails, set it by hand:
-# Settings -> Pages -> Source: "GitHub Actions".
+# This is the *alternative* route, and is not what currently serves the site.
 #
-# Note it must be "GitHub Actions", not "Deploy from a branch". Branch
-# deployment serves the repository root, where index.html is Vite's development
-# entry point — it references unbundled source and will not run in a browser.
+# The built site is committed at the repository root (see cli/build-pages.mjs),
+# so Pages serves it straight from the branch with nothing to configure. That
+# keeps a copy of the build in version control, which has to be refreshed with
+# `npm run build:pages` whenever the source changes.
 #
-# (On a private repository, Pages needs a paid plan. If yours is private and
-# you would rather not make it public, drag the `dist` folder onto
-# app.netlify.com/drop instead — it hosts private static sites for free.)
+# This workflow removes that duty by building on every push — but it only takes
+# effect once the repository's Pages source is set to "GitHub Actions"
+# (Settings -> Pages). Until then it builds and uploads without being served,
+# which is harmless. Once switched, the committed index.html and assets/ become
+# redundant and can be deleted.
 
 name: Deploy studio to Pages
 

@@ -46,7 +46,7 @@ try {
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 
-  await page.goto(`${server.origin}/index.html`, { waitUntil: 'load' });
+  await page.goto(`${server.origin}/app.html`, { waitUntil: 'load' });
   await page.waitForFunction('window.studio && window.studio.engine', { timeout: 30000 });
   await page.waitForTimeout(3000);
 
@@ -150,7 +150,7 @@ try {
   });
   const sp = await sandbox.newPage();
   sp.on('pageerror', (e) => errors.push(e.message));
-  await sp.goto(`${server.origin}/index.html`, { waitUntil: 'load' });
+  await sp.goto(`${server.origin}/app.html`, { waitUntil: 'load' });
   await sp.waitForFunction('window.studio && window.studio.engine', { timeout: 30000 });
   await sp.waitForTimeout(2500);
 

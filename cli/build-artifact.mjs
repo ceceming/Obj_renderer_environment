@@ -4,7 +4,7 @@
  *
  * Some hosts (a published Artifact, for one) supply their own document
  * skeleton and expect only the page's contents — a title, styles, markup and
- * scripts — rather than a full HTML document. This rewrites `dist/index.html`
+ * scripts — rather than a full HTML document. This rewrites `dist/app.html`
  * into that shape and copies the hashed assets alongside it, so the same build
  * can be served either way.
  *
@@ -19,14 +19,14 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = join(ROOT, 'dist');
 const OUT = join(ROOT, 'dist-artifact');
 
-const html = readFileSync(join(DIST, 'index.html'), 'utf8');
+const html = readFileSync(join(DIST, 'app.html'), 'utf8');
 
 const script = html.match(/<script[^>]*src="\.\/(assets\/[^"]+)"/)?.[1];
 const style = html.match(/<link[^>]*rel="stylesheet"[^>]*href="\.\/(assets\/[^"]+)"/)?.[1];
 const body = html.match(/<body>([\s\S]*)<\/body>/)?.[1]?.trim();
 
 if (!script || !style || !body) {
-  console.error('Could not parse dist/index.html — run `npm run build` first.');
+  console.error('Could not parse dist/app.html — run `npm run build` first.');
   process.exit(1);
 }
 

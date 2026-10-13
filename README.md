@@ -93,7 +93,7 @@ Three ways to reach it:
 | | How | Good for |
 |---|---|---|
 | **Locally** | `npm start` | Everything. The only route that supports EXR, GLB and the CLI. |
-| **GitHub Pages** | Settings → Pages → Source: *GitHub Actions*. The included workflow builds and deploys on every push. | A permanent URL of your own, on any device. Private repos need a paid plan — otherwise drop the `dist` folder on [netlify.com/drop](https://app.netlify.com/drop). |
+| **GitHub Pages** | Already set up — the built site is committed at the repository root, so Pages serves it straight from the branch with no configuration. | A permanent URL of your own, on any device. |
 | **A hosted viewer** | A published page | Opening it immediately on a tablet. Saving goes through the host's prompt; EXR and GLB are not accepted there. |
 
 ### On an iPad
@@ -121,6 +121,33 @@ Two limits worth knowing:
 The **command-line renderer does not run on iPad** — that means no MP4/GIF
 encoding, no overnight batch renders, and no EXR. Frame sequences still export
 from the browser as a ZIP, ready to assemble later.
+
+### Publishing a change
+
+The site GitHub Pages serves is **committed**, because deploying from a branch
+publishes the repository root as-is and runs no build of its own. So after
+changing anything you want published:
+
+```bash
+npm run build:pages     # rebuilds and copies the result to the repository root
+git commit -am "..."    # index.html and assets/ are part of the change
+```
+
+`npm run check:pages` reports whether what is committed still matches what the
+source builds — worth running if a change does not seem to have taken effect.
+
+The repository root therefore holds two entry points, which is worth knowing
+before editing either:
+
+| | |
+|---|---|
+| `app.html` | the **source** entry, used by `npm start`. `/` redirects here while developing. |
+| `index.html` + `assets/` | the **built** site, generated — never edit by hand. |
+
+A workflow for the other route, deploying through GitHub Actions with no
+committed build, is in `.github/workflows/pages.yml`. It needs the repository's
+Pages source set to "GitHub Actions"; until then it builds and uploads without
+being the version served.
 
 ---
 

@@ -13,7 +13,9 @@
     "postinstall": "node cli/check-env.mjs",
     "smoke": "node cli/smoke.mjs",
     "build:artifact": "vite build && node cli/build-artifact.mjs",
-    "calibrate": "node cli/calib.mjs"
+    "calibrate": "node cli/calib.mjs",
+    "build:pages": "vite build && node cli/build-pages.mjs",
+    "check:pages": "vite build && node cli/check-pages.mjs"
   },
   "dependencies": {
     "three": "^0.186.0",

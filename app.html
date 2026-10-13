@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OBJ Render Studio</title>
+</head>
+<body>
+  <div id="app">
+    <header id="topbar">
+      <div class="brand">OBJ Render Studio <span>· physically based</span></div>
+      <button class="btn" id="btn-open">Open model</button>
+      <button class="btn" id="btn-engine" title="Toggle between real-time and path-traced rendering (P)">Real-time</button>
+      <button class="btn" id="btn-touchmode" style="display:none" title="What a single finger drag does">Drag: camera</button>
+      <div class="spacer"></div>
+      <button class="btn ghost" id="btn-reset" title="Reset all settings">Reset</button>
+      <button class="btn primary" id="btn-export" title="Render and save (Cmd/Ctrl+S)">Render &amp; save</button>
+    </header>
+
+    <aside id="rail"></aside>
+
+    <main id="stage">
+      <div id="canvas-wrap">
+        <canvas id="view"></canvas>
+        <div id="thirds"></div>
+        <div id="safe-frame"></div>
+      </div>
+      <div id="overlay">
+        <div class="badge busy" id="busy-badge" style="display:none"></div>
+        <div class="badge" id="toast" style="display:none"></div>
+      </div>
+      <div id="progress"><i id="progress-bar"></i></div>
+      <div id="drop-hint">
+        <div>
+          <div style="font-size:17px;margin-bottom:6px">Drop your model here</div>
+          <div style="opacity:.6">.obj with its .mtl and textures — or a whole folder.<br>
+          GLB, GLTF, FBX, STL, PLY, DAE and 3MF also work.</div>
+        </div>
+      </div>
+    </main>
+
+    <footer id="statusbar">
+      <span id="status-left"></span>
+      <span class="spacer"></span>
+      <span id="status-right"></span>
+      <span style="opacity:.6">
+        drag orbit · shift+drag pan · alt+drag spin lights · scroll zoom ·
+        <kbd>G</kbd> grid <kbd>F</kbd> frame <kbd>P</kbd> engine <kbd>space</kbd> play
+      </span>
+    </footer>
+  </div>
+  <script type="module" src="/src/app/main.js"></script>
+  <script>
+    // Last-resort notice for the two ways this page can come up empty:
+    // served as unbuilt source (the script above is Vite's development entry,
+    // using bare module specifiers a browser cannot resolve), or built but
+    // unable to fetch its assets. Both leave an empty shell with the reason
+    // buried in the console, so say it on the page instead. It survives into
+    // the build deliberately — that is where the second case happens.
+    setTimeout(function () {
+      if (window.studio) return;
+      var el = document.createElement('div');
+      el.style.cssText =
+        'position:fixed;inset:0;z-index:99;display:grid;place-items:center;padding:24px;' +
+        'background:#0d0e11;color:#e6e8ec;font:14px/1.6 system-ui,sans-serif;text-align:center';
+      el.innerHTML =
+        '<div style="max-width:30rem">' +
+        '<div style="font-size:17px;margin-bottom:10px">The studio did not start</div>' +
+        '<div style="opacity:.72">Its scripts did not load. Usually this means the page is being ' +
+        'served as unbuilt source, or its assets are missing.' +
+        '<br><br>Locally, run <code style="background:#22262c;padding:2px 6px;border-radius:4px">npm install &amp;&amp; npm start</code>. ' +
+        'To host it, deploy the <code style="background:#22262c;padding:2px 6px;border-radius:4px">dist/</code> folder ' +
+        'produced by <code style="background:#22262c;padding:2px 6px;border-radius:4px">npm run build</code>.' +
+        '<br><br>On GitHub Pages, Settings &rarr; Pages &rarr; Source must be <b>GitHub Actions</b> ' +
+        '&mdash; not &ldquo;Deploy from a branch&rdquo;, which serves the repository root and cannot work.' +
+        '<br><br><span style="opacity:.7">The browser console has the underlying error.</span></div></div>';
+      document.body.appendChild(el);
+    }, 8000);
+  </script>
+</body>
+</html>
