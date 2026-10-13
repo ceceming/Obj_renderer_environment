@@ -3,18 +3,14 @@
 # Gives you a permanent URL you can open on any device — including an iPad —
 # without needing a computer to run `npm start`.
 #
-# This is the *alternative* route, and is not what currently serves the site.
+# This is what serves the site. It requires the repository's Pages source to be
+# set to "GitHub Actions" (Settings -> Pages), which it is.
 #
-# The built site is committed at the repository root (see cli/build-pages.mjs),
-# so Pages serves it straight from the branch with nothing to configure. That
-# keeps a copy of the build in version control, which has to be refreshed with
-# `npm run build:pages` whenever the source changes.
-#
-# This workflow removes that duty by building on every push — but it only takes
-# effect once the repository's Pages source is set to "GitHub Actions"
-# (Settings -> Pages). Until then it builds and uploads without being served,
-# which is harmless. Once switched, the committed index.html and assets/ become
-# redundant and can be deleted.
+# Note that the built entry is app.html, not index.html — the repository root
+# keeps index.html for a committed fallback copy of the site. The build emits
+# index.html into dist/ as well (see vite.config.js), because a host serving
+# dist/ still asks for "/". Without it the deployment reports success and every
+# visitor gets a 404.
 
 name: Deploy studio to Pages
 

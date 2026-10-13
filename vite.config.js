@@ -1,4 +1,9 @@
 import { defineConfig } from 'vite';
+import { copyFileSync, existsSync } from 'node:fs';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname_ = dirname(fileURLToPath(import.meta.url));
 
 /**
  * In development the app is entered through `app.html`, not `index.html`.
@@ -24,8 +29,24 @@ const devEntryRedirect = {
   }
 };
 
+/**
+ * The built entry is `app.html`, because the repository root keeps `index.html`
+ * for the committed site. A host serving `dist/` directly — GitHub Pages via
+ * Actions, say — still asks for `/`, so emit `index.html` alongside it. Without
+ * this the deployment looks healthy and every visitor gets a 404.
+ */
+const emitIndexAlias = {
+  name: 'emit-index-alias',
+  apply: 'build',
+  closeBundle() {
+    const dist = resolve(__dirname_, 'dist');
+    const entry = join(dist, 'app.html');
+    if (existsSync(entry)) copyFileSync(entry, join(dist, 'index.html'));
+  }
+};
+
 export default defineConfig({
-  plugins: [devEntryRedirect],
+  plugins: [devEntryRedirect, emitIndexAlias],
   base: './',
   server: { host: '127.0.0.1', port: 5173, fs: { allow: ['..'] } },
   build: {

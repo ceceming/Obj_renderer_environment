@@ -53,4 +53,4 @@ console.log('  index.html   <- dist/app.html');
 console.log(`  assets/      <- ${assets.length} files`);
 console.log(`  .nojekyll    written`);
 console.log(`  total        ${(bytes / 1024 / 1024).toFixed(2)} MB committed`);
-console.log('\n  Commit these to publish. The site serves from the repository root.');
+console.log('\n  Commit these to refresh the fallback copy served if Pages ever deploys from a branch.');
